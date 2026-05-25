@@ -7,7 +7,7 @@ from typing import Any
 
 
 HEADER_SIZE = 8
-RECV_BUFFER = 1 << 20  # 1 MB por chamada — evita passar nbytes enorme direto ao SO
+RECV_BUFFER = 1 << 20
 
 
 def send_message(sock: socket.socket, payload: Any) -> None:
@@ -17,7 +17,6 @@ def send_message(sock: socket.socket, payload: Any) -> None:
 
 
 def recv_exact(sock: socket.socket, nbytes: int) -> bytes:
-    """Recebe exatamente `nbytes` bytes, em chunks de no máximo RECV_BUFFER."""
     buf = bytearray(nbytes)
     view = memoryview(buf)
     received = 0

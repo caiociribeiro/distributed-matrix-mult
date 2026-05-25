@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import List
 
-from src.models import MatrixShape, MatrixTest
+from .models import MatrixShape, MatrixTest
 
 
 TEST_LINE_RE = re.compile(r"^\s*(\d+)\s*x\s*(\d+)\s+(\d+)\s*x\s*(\d+)\s*$", re.IGNORECASE)

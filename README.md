@@ -1,27 +1,16 @@
 # Multiplicação de Matrizes Distribuída
 
-## Execução local
-
+Execução local:
 ```bash
 python main.py tests/test_5.txt
 ```
 
-## Execução com número específico de workers
-
+Workers distribuídos simulados:
 ```bash
-python main.py tests/test_5.txt --workers 4
+python main.py tests/test_5.txt --distributed-workers 2,4,6
 ```
 
-## Modo socket com workers remotos
-
-Em cada máquina worker:
-
+Worker manual:
 ```bash
 python main.py --worker --host 0.0.0.0 --port 5001
-```
-
-No cliente:
-
-```bash
-python main.py testes.txt --mode socket --hosts 192.168.0.10:5001,192.168.0.11:5001
 ```

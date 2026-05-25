@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 
@@ -17,13 +19,36 @@ class MatrixTest:
         return self.a.cols == self.b.rows
 
 
+@dataclass(frozen=True)
+class MatrixDimensions:
+    rows_a: int
+    cols_a: int
+    rows_b: int
+    cols_b: int
+
+    @property
+    def work_units(self) -> int:
+        return self.rows_a * self.cols_a * self.cols_b
+
+    @property
+    def result_cells(self) -> int:
+        return self.rows_a * self.cols_b
+
+
 @dataclass
 class BenchmarkResult:
     test_index: int
-    a_shape: str
-    b_shape: str
+    mode: str
     workers: int
-    serial_ms: float
-    distributed_ms: float
+    rows_a: int
+    cols_a: int
+    rows_b: int
+    cols_b: int
+    work_units: int
+    elapsed_ms: float
     speedup: float
     correct: bool
+
+    @property
+    def signature(self) -> str:
+        return f"{self.rows_a}x{self.cols_a} · {self.rows_b}x{self.cols_b}"

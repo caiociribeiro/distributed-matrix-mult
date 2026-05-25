@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from typing import Sequence
+
 import numpy as np
 
 
@@ -34,7 +37,7 @@ def multiply_block_rows(a_block: Matrix, b: Matrix) -> Matrix:
     return multiply_serial(a_block, b)
 
 
-def split_matrix_rows(matrix: Matrix, num_parts: int):
+def split_matrix_rows(matrix: Matrix, num_parts: int) -> list[Matrix]:
     if num_parts <= 1:
         return [matrix]
     if matrix.size == 0:
@@ -44,7 +47,7 @@ def split_matrix_rows(matrix: Matrix, num_parts: int):
     return [chunk for chunk in np.array_split(matrix, num_parts, axis=0) if chunk.size > 0]
 
 
-def concat_vertical(blocks):
+def concat_vertical(blocks: Sequence[Matrix]) -> Matrix:
     if not blocks:
         return np.empty((0, 0), dtype=np.int64)
     if len(blocks) == 1:
@@ -54,3 +57,45 @@ def concat_vertical(blocks):
 
 def matrices_equal(a: Matrix, b: Matrix) -> bool:
     return np.array_equal(a, b)
+
+
+def estimate_work_units(a: Matrix, b: Matrix) -> int:
+    if a.ndim != 2 or b.ndim != 2:
+        raise ValueError("As matrizes devem ser bidimensionais.")
+    return int(a.shape[0] * a.shape[1] * b.shape[1])
+
+
+def _thread_chunk(args: tuple[Matrix, Matrix]) -> Matrix:
+    a_block, b = args
+    return multiply_block_rows(a_block, b)
+
+
+def multiply_parallel_threads(a: Matrix, b: Matrix, workers: int = 4) -> Matrix:
+    if workers <= 1:
+        return multiply_serial(a, b)
+
+    chunks = split_matrix_rows(a, workers)
+    if len(chunks) == 1:
+        return multiply_serial(a, b)
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        results = list(executor.map(_thread_chunk, [(chunk, b) for chunk in chunks]))
+    return concat_vertical(results)
+
+
+def _process_chunk(args: tuple[Matrix, Matrix]) -> Matrix:
+    a_block, b = args
+    return multiply_block_rows(a_block, b)
+
+
+def multiply_parallel_processes(a: Matrix, b: Matrix, workers: int = 4) -> Matrix:
+    if workers <= 1:
+        return multiply_serial(a, b)
+
+    chunks = split_matrix_rows(a, workers)
+    if len(chunks) == 1:
+        return multiply_serial(a, b)
+
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        results = list(executor.map(_process_chunk, [(chunk, b) for chunk in chunks]))
+    return concat_vertical(results)
