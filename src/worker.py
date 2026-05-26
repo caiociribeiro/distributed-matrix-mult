@@ -1,62 +1,77 @@
-from __future__ import annotations
-
 import socket
 import threading
-from typing import Tuple
+import multiprocessing as mp
 
-from .matrix_ops import multiply_block_rows, multiply_parallel_processes
+from .matrix_ops import multiply_serial, multiply_parallel_processes
 from .socket_utils import recv_message, send_message
 
 
-def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
+# iniciar os workers em processos separados
+def start_workers(workers):
+    processes = []
+
+    for host, port in workers:
+        p = mp.Process(target=_run_worker_server, args=(host, port))
+        p.start()
+        processes.append(p)
+
+    return processes
+
+
+# envia sinal de shutdown para todos os workers
+def shutdown_workers(workers):
+    for host, port in workers:
+        with socket.create_connection((host, port)) as sock:
+            send_message(sock, {"action": "shutdown"})
+            recv_message(sock)
+
+
+# worker responsavel por receber as tarefas de multiplicacao, processa-las e enviar os resultados de volta para o coordenador
+# se serial, chama multiply_serial diretamente, simulando o uso de 1 core por worker
+# se paralelo, chama multiply_parallel_processes com o numero de workers internos configurado, simulando o uso de mais de 1 core por worker
+def _handle_client(conn):
     with conn:
-        try:
-            request = recv_message(conn)
-            if not isinstance(request, dict):
-                raise ValueError("Mensagem inválida.")
+        request = recv_message(conn)
 
-            action = request.get("action")
+        if request["action"] == "shutdown":
+            send_message(conn, {"ok": True})
+            return
 
-            if action == "shutdown":
-                send_message(conn, {"ok": True, "shutdown": True})
-                return
+        sub_a = request["sub_a"]
+        b = request["b"]
 
-            if action != "multiply":
-                raise ValueError(f"Ação desconhecida: {action}")
-
-            sub_a = request["sub_a"]
-            b = request["b"]
-            chunk_index = int(request["chunk_index"])
-            parallel = bool(request.get("parallel", False))
-            internal_workers = int(request.get("internal_workers", 2))
-
-            if parallel:
-                result = multiply_parallel_processes(sub_a, b, workers=max(2, internal_workers))
-            else:
-                result = multiply_block_rows(sub_a, b)
-
-            send_message(
-                conn,
-                {
-                    "ok": True,
-                    "chunk_index": chunk_index,
-                    "result": result,
-                },
+        if request["parallel"]:
+            result = multiply_parallel_processes(
+                sub_a,
+                b,
+                workers=request["internal_workers"],
             )
-        except Exception as exc:  # noqa: BLE001
-            try:
-                send_message(conn, {"ok": False, "error": str(exc)})
-            except Exception:
-                pass
+        else:
+            result = multiply_serial(sub_a, b)
+
+        send_message(
+            conn,
+            {
+                "ok": True,
+                "chunk_index": request["chunk_index"],
+                "result": result,
+            },
+        )
 
 
-def run_worker_server(host: str, port: int) -> None:
+# inicia o server do worker via socket TCP
+def _run_worker_server(host, port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.bind((host, port))
         server.listen()
 
         while True:
-            conn, addr = server.accept()
-            thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            conn, _ = server.accept()
+
+            thread = threading.Thread(
+                target=_handle_client,
+                args=(conn,),
+                daemon=True,
+            )
+
             thread.start()

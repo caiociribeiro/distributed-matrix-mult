@@ -17,15 +17,18 @@ from .models import BenchmarkResult, MatrixTest
 from .report import save_test_artifacts
 
 
+# executa os benchmarks a partir da lista de testes
+# retorna os resultados
 def run_benchmarks(
     tests: Sequence[MatrixTest],
     distributed_workers: Sequence[tuple[str, int]],
+    distributed_worker_counts: Sequence[int],
     local_parallel_workers: int = 4,
     low: int = -9,
     high: int = 9,
     out_dir: Path | None = None,
-) -> list[BenchmarkResult]:
-    results: list[BenchmarkResult] = []
+):
+    results = []
 
     for index, test in enumerate(tests, start=1):
         print(
@@ -53,7 +56,9 @@ def run_benchmarks(
         outputs["threads"] = threads_result
 
         t0 = time.perf_counter()
-        processes_result = multiply_parallel_processes(a, b, workers=local_parallel_workers)
+        processes_result = multiply_parallel_processes(
+            a, b, workers=local_parallel_workers
+        )
         t1 = time.perf_counter()
         processes_ms = (t1 - t0) * 1000.0
         outputs["processes"] = processes_result
@@ -106,7 +111,7 @@ def run_benchmarks(
             )
         )
 
-        for worker_count in sorted({len(distributed_workers)} | {2, 4, 6}):
+        for worker_count in distributed_worker_counts:
             workers = list(distributed_workers[:worker_count])
             if len(workers) < worker_count:
                 continue
@@ -119,9 +124,7 @@ def run_benchmarks(
 
             t0 = time.perf_counter()
             dist_parallel_result = distributed_multiply_parallel(
-                a,
-                b,
-                workers,
+                a, b, workers, local_parallel_workers
             )
             t1 = time.perf_counter()
             dist_parallel_ms = (t1 - t0) * 1000.0
@@ -138,7 +141,9 @@ def run_benchmarks(
                     cols_b=test.b.cols,
                     work_units=work_units,
                     elapsed_ms=dist_serial_ms,
-                    speedup=serial_ms / dist_serial_ms if dist_serial_ms > 0 else float("inf"),
+                    speedup=serial_ms / dist_serial_ms
+                    if dist_serial_ms > 0
+                    else float("inf"),
                     correct=matrices_equal(serial_result, dist_serial_result),
                 )
             )
@@ -154,7 +159,9 @@ def run_benchmarks(
                     cols_b=test.b.cols,
                     work_units=work_units,
                     elapsed_ms=dist_parallel_ms,
-                    speedup=serial_ms / dist_parallel_ms if dist_parallel_ms > 0 else float("inf"),
+                    speedup=serial_ms / dist_parallel_ms
+                    if dist_parallel_ms > 0
+                    else float("inf"),
                     correct=matrices_equal(serial_result, dist_parallel_result),
                 )
             )
@@ -165,10 +172,8 @@ def run_benchmarks(
                 test_index=index,
                 a=a,
                 b=b,
-                outputs_by_mode={k: v for k, v in outputs.items() if hasattr(v, "shape")},
-                metadata={
-                    "local_parallel_workers": local_parallel_workers,
-                    "distributed_workers": [list(x) for x in distributed_workers],
+                outputs_by_mode={
+                    k: v for k, v in outputs.items() if hasattr(v, "shape")
                 },
             )
 

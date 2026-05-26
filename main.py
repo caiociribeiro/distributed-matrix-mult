@@ -1,50 +1,55 @@
 from __future__ import annotations
 
-import multiprocessing as mp
 import sys
 import time
+from pathlib import Path
 
 from src.benchmark import run_benchmarks
-from src.distributed import shutdown_workers
 from src.parser import parse_test_file
 from src.report import (
-    ensure_output_dir,
     plot_results,
     print_table,
     write_csv,
 )
-from src.worker import run_worker_server
+from src.worker import start_workers, shutdown_workers
+
 
 BASE_PORT = 5000
 DISTRIBUTED_WORKER_COUNTS = [2, 4, 6]
 LOCAL_WORKERS = 4
 
 
-def main() -> int:
+def main():
     if len(sys.argv) < 2:
-        print("Uso: python main.py <arquivo_de_testes>", file=sys.stderr)
-        return 2
+        print("Uso: python main.py <arquivo_de_testes>")
+        return
 
     tests = parse_test_file(sys.argv[1])
+
+    # cria lista de workers locais
     workers = [
         ("127.0.0.1", BASE_PORT + i) for i in range(max(DISTRIBUTED_WORKER_COUNTS))
     ]
-    output_dir = ensure_output_dir()
 
-    print(f"[main] {len(tests)} teste(s) carregado(s)", flush=True)
-    print(f"[main] output: {output_dir.resolve()}", flush=True)
+    # cria diretorio de output
+    output_dir = Path("results") / time.strftime("%Y%m%d%H%M%S")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "matrices").mkdir(parents=True, exist_ok=True)
 
-    local_processes: list[mp.Process] = []
-    for host, port in workers:
-        p = mp.Process(target=run_worker_server, args=(host, port))
-        p.start()
-        local_processes.append(p)
-    time.sleep(1.0)
+    print(f"[main] {len(tests)} teste(s) carregado(s)")
+    print(f"[main] output: {output_dir.resolve()}")
+
+    # inicia os workers
+    local_processes = start_workers(workers)
+
+    # espera os sockets iniciarem
+    time.sleep(1)
 
     try:
         results = run_benchmarks(
             tests=tests,
             distributed_workers=workers,
+            distributed_worker_counts=DISTRIBUTED_WORKER_COUNTS,
             local_parallel_workers=LOCAL_WORKERS,
             out_dir=output_dir,
         )
@@ -54,21 +59,22 @@ def main() -> int:
         csv_path = write_csv(results, output_dir)
         plot_paths = plot_results(results, output_dir)
 
-        print(f"\nArquivos gerados em: {output_dir.resolve()}", flush=True)
+        print(f"\nArquivos gerados em: {output_dir.resolve()}")
+
         for path in [csv_path, *plot_paths]:
-            print(f"- {path.name}", flush=True)
+            print(f"- {path.name}")
 
     finally:
+        # encerra workers via socket
         shutdown_workers(workers)
+
+        # encerra processos locais
         for p in local_processes:
-            if p.is_alive():
-                p.join(timeout=2)
+            p.join(timeout=2)
+
             if p.is_alive():
                 p.terminate()
 
-    return 0
-
 
 if __name__ == "__main__":
-    mp.freeze_support()
     raise SystemExit(main())

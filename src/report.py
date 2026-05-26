@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import csv
-import json
-import time
 from pathlib import Path
-from typing import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from .matrix_ops import Matrix
-from .models import BenchmarkResult
 
 
 MODE_LABELS = {
@@ -22,29 +18,19 @@ MODE_LABELS = {
 }
 
 
-def ensure_output_dir() -> Path:
-    out_dir = Path("results") / time.strftime("%Y%m%d%H%M%S")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "matrices").mkdir(parents=True, exist_ok=True)
-    return out_dir
-
-
-def _sanitize_label(label: str) -> str:
-    return label.replace("/", "_").replace(" ", "_")
-
-
-def save_matrix_csv(path: Path, matrix: Matrix) -> None:
+# salva uma matriz em csv
+def save_matrix_csv(path, matrix):
     np.savetxt(path, matrix, fmt="%d", delimiter=",")
 
 
+# salva os artefatos de um teste (matrizes A, B e os resultados de cada modo)
 def save_test_artifacts(
     out_dir: Path,
     test_index: int,
     a: Matrix,
     b: Matrix,
     outputs_by_mode: dict[str, Matrix],
-    metadata: dict[str, object] | None = None,
-) -> Path:
+):
     test_dir = out_dir / "matrices" / f"test_{test_index:03d}"
     test_dir.mkdir(parents=True, exist_ok=True)
 
@@ -52,22 +38,12 @@ def save_test_artifacts(
     save_matrix_csv(test_dir / "B.csv", b)
 
     for mode, matrix in outputs_by_mode.items():
-        save_matrix_csv(test_dir / f"{_sanitize_label(mode)}.csv", matrix)
+        save_matrix_csv(test_dir / f"{mode}.csv", matrix)
 
-    payload = metadata or {}
-    payload = {
-        **payload,
-        "test_index": test_index,
-        "shape_a": [int(a.shape[0]), int(a.shape[1])],
-        "shape_b": [int(b.shape[0]), int(b.shape[1])],
-    }
-    (test_dir / "metadata.json").write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
     return test_dir
 
 
-def write_csv(results: Sequence[BenchmarkResult], out_dir: Path) -> Path:
+def write_csv(results, out_dir):
     path = out_dir / "results.csv"
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -83,7 +59,6 @@ def write_csv(results: Sequence[BenchmarkResult], out_dir: Path) -> Path:
                 "work_units",
                 "elapsed_ms",
                 "speedup",
-                "correct",
             ]
         )
         for r in results:
@@ -99,13 +74,12 @@ def write_csv(results: Sequence[BenchmarkResult], out_dir: Path) -> Path:
                     r.work_units,
                     f"{r.elapsed_ms:.6f}",
                     f"{r.speedup:.6f}",
-                    r.correct,
                 ]
             )
     return path
 
 
-def print_table(results: Sequence[BenchmarkResult]) -> None:
+def print_table(results):
     headers = [
         "Teste",
         "Modo",
@@ -115,7 +89,6 @@ def print_table(results: Sequence[BenchmarkResult]) -> None:
         "Work",
         "Tempo (ms)",
         "Speedup",
-        "OK",
     ]
     rows = [
         [
@@ -127,7 +100,6 @@ def print_table(results: Sequence[BenchmarkResult]) -> None:
             str(r.work_units),
             f"{r.elapsed_ms:.2f}",
             f"{r.speedup:.2f}",
-            "sim" if r.correct else "não",
         ]
         for r in results
     ]
@@ -137,7 +109,7 @@ def print_table(results: Sequence[BenchmarkResult]) -> None:
         for i, cell in enumerate(row):
             widths[i] = max(widths[i], len(cell))
 
-    def fmt(row: Sequence[str]) -> str:
+    def fmt(row):
         return " | ".join(cell.ljust(widths[i]) for i, cell in enumerate(row))
 
     sep = "-+-".join("-" * w for w in widths)
@@ -147,7 +119,7 @@ def print_table(results: Sequence[BenchmarkResult]) -> None:
         print(fmt(row))
 
 
-def plot_results(results: Sequence[BenchmarkResult], out_dir: Path) -> list[Path]:
+def plot_results(results, out_dir):
     generated: list[Path] = []
 
     target_workers = [2, 4, 6]
