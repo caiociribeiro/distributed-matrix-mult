@@ -30,9 +30,13 @@ def shutdown_workers(workers):
     for host, port in workers:
         print(f"[workers] enviando shutdown para {host}:{port}")
 
-        with socket.create_connection((host, port)) as sock:
-            send_message(sock, {"action": "shutdown"})
-            recv_message(sock)
+        try:
+            with socket.create_connection((host, port)) as sock:
+                send_message(sock, {"action": "shutdown"})
+                recv_message(sock)
+
+        except Exception:
+            pass
 
 
 # worker responsavel por receber as tarefas de multiplicacao

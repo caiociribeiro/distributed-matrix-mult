@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import sys
 import time
 from pathlib import Path
@@ -43,9 +41,9 @@ def main():
     local_processes = start_workers(workers)
 
     # espera os sockets iniciarem
-    time.sleep(1)
 
     try:
+        time.sleep(1)
         results = run_benchmarks(
             tests=tests,
             distributed_workers=workers,
