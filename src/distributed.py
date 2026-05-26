@@ -1,34 +1,29 @@
-from __future__ import annotations
-
-import os
 import socket
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Sequence, Tuple
-
-import numpy as np
+import os
+from concurrent.futures import ThreadPoolExecutor
 
 from .matrix_ops import concat, split_matrix_rows
 from .socket_utils import recv_message, send_message
 
 
-Matrix = np.ndarray
-WorkerEndpoint = Tuple[str, int]
-CONNECT_TIMEOUT = 30
-
-
+# envia um chunk para um worker
 def _send_job(
     sub_a,
     b,
     endpoint,
-    chunk_index,
     parallel,
     internal_workers,
 ):
     host, port = endpoint
 
+    print(
+        f"[distributed] enviando chunk "
+        f"{sub_a.shape[0]}x{sub_a.shape[1]} "
+        f"para {host}:{port}"
+    )
+
     request = {
         "action": "multiply",
-        "chunk_index": chunk_index,
         "sub_a": sub_a,
         "b": b,
         "parallel": parallel,
@@ -37,7 +32,10 @@ def _send_job(
 
     with socket.create_connection((host, port)) as sock:
         send_message(sock, request)
+
         response = recv_message(sock)
+
+    print(f"[distributed] resultado recebido de {host}:{port}")
 
     return response["result"]
 
@@ -52,6 +50,8 @@ def _distributed_multiply(
 ):
     chunks = split_matrix_rows(a, len(workers))
 
+    print(f"[distributed] dividindo matriz em {len(chunks)} chunk(s)")
+
     with ThreadPoolExecutor(max_workers=len(chunks)) as executor:
         futures = [
             executor.submit(
@@ -59,7 +59,6 @@ def _distributed_multiply(
                 chunk,
                 b,
                 workers[idx],
-                idx,
                 parallel,
                 internal_workers,
             )
@@ -67,7 +66,6 @@ def _distributed_multiply(
         ]
 
         results = [future.result() for future in futures]
-
     return concat(results)
 
 
@@ -87,8 +85,11 @@ def distributed_multiply_parallel(
     a,
     b,
     workers,
-    internal_workers,
 ):
+    cpu_count = os.cpu_count() or 2
+
+    internal_workers = max(1, cpu_count // len(workers))
+
     return _distributed_multiply(
         a,
         b,
@@ -96,10 +97,3 @@ def distributed_multiply_parallel(
         parallel=True,
         internal_workers=internal_workers,
     )
-
-
-def shutdown_workers(workers):
-    for host, port in workers:
-        with socket.create_connection((host, port)) as sock:
-            send_message(sock, {"action": "shutdown"})
-            recv_message(sock)

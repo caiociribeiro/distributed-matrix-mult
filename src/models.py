@@ -1,38 +1,16 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass
 class MatrixShape:
     rows: int
     cols: int
 
 
-@dataclass(frozen=True)
+@dataclass
 class MatrixTest:
     a: MatrixShape
     b: MatrixShape
-
-    @property
-    def valid(self) -> bool:
-        return self.a.cols == self.b.rows
-
-
-@dataclass(frozen=True)
-class MatrixDimensions:
-    rows_a: int
-    cols_a: int
-    rows_b: int
-    cols_b: int
-
-    @property
-    def work_units(self) -> int:
-        return self.rows_a * self.cols_a * self.cols_b
-
-    @property
-    def result_cells(self) -> int:
-        return self.rows_a * self.cols_b
 
 
 @dataclass
@@ -50,5 +28,5 @@ class BenchmarkResult:
     correct: bool
 
     @property
-    def signature(self) -> str:
+    def signature(self):
         return f"{self.rows_a}x{self.cols_a} · {self.rows_b}x{self.cols_b}"

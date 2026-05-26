@@ -10,9 +10,14 @@ from .socket_utils import recv_message, send_message
 def start_workers(workers):
     processes = []
 
+    print(f"[workers] iniciando {len(workers)} worker(s)")
+
     for host, port in workers:
         p = mp.Process(target=_run_worker_server, args=(host, port))
         p.start()
+
+        print(f"[workers] worker iniciado em {host}:{port}")
+
         processes.append(p)
 
     return processes
@@ -20,40 +25,55 @@ def start_workers(workers):
 
 # envia sinal de shutdown para todos os workers
 def shutdown_workers(workers):
+    print("[workers] encerrando workers")
+
     for host, port in workers:
+        print(f"[workers] enviando shutdown para {host}:{port}")
+
         with socket.create_connection((host, port)) as sock:
             send_message(sock, {"action": "shutdown"})
             recv_message(sock)
 
 
-# worker responsavel por receber as tarefas de multiplicacao, processa-las e enviar os resultados de volta para o coordenador
-# se serial, chama multiply_serial diretamente, simulando o uso de 1 core por worker
-# se paralelo, chama multiply_parallel_processes com o numero de workers internos configurado, simulando o uso de mais de 1 core por worker
-def _handle_client(conn):
+# worker responsavel por receber as tarefas de multiplicacao
+def _handle_client(conn, port):
     with conn:
+        print(f"[worker {port}] conexão recebida")
+
         request = recv_message(conn)
 
         if request["action"] == "shutdown":
+            print(f"[worker {port}] encerrando")
+
             send_message(conn, {"ok": True})
             return
 
         sub_a = request["sub_a"]
         b = request["b"]
 
+        print(f"[worker {port}] processando chunk {sub_a.shape[0]}x{sub_a.shape[1]}")
+
         if request["parallel"]:
+            print(
+                f"[worker {port}] usando "
+                f"{request['internal_workers']} processos internos"
+            )
+
             result = multiply_parallel_processes(
                 sub_a,
                 b,
                 workers=request["internal_workers"],
             )
+
         else:
             result = multiply_serial(sub_a, b)
+
+        print(f"[worker {port}] chunk finalizado")
 
         send_message(
             conn,
             {
                 "ok": True,
-                "chunk_index": request["chunk_index"],
                 "result": result,
             },
         )
@@ -65,12 +85,14 @@ def _run_worker_server(host, port):
         server.bind((host, port))
         server.listen()
 
+        print(f"[worker {port}] aguardando conexões")
+
         while True:
             conn, _ = server.accept()
 
             thread = threading.Thread(
                 target=_handle_client,
-                args=(conn,),
+                args=(conn, port),
                 daemon=True,
             )
 

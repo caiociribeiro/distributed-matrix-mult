@@ -3,7 +3,7 @@ from pathlib import Path
 from .models import MatrixShape, MatrixTest
 
 
-def parse_test_file(path: str) -> list[MatrixTest]:
+def parse_test_file(path):
     lines = Path(path).read_text().splitlines()
 
     count = int(lines[0])
