@@ -14,7 +14,7 @@ from src.worker import start_workers, shutdown_workers
 
 BASE_PORT = 5000
 DISTRIBUTED_WORKER_COUNTS = [2, 4, 6]
-LOCAL_WORKERS = 4
+LOCAL_WORKERS = 12
 
 
 def main():
@@ -24,12 +24,12 @@ def main():
 
     tests = parse_test_file(sys.argv[1])
 
-    # cria lista de workers locais
+    # cria lista de tuplas (host, port) para os workers distribuidos
     workers = [
         ("127.0.0.1", BASE_PORT + i) for i in range(max(DISTRIBUTED_WORKER_COUNTS))
     ]
 
-    # cria diretorio de output
+    # garante que exista um diretorio de output e cria subdiretorio do teste
     output_dir = Path("results") / time.strftime("%Y%m%d%H%M%S")
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "matrices").mkdir(parents=True, exist_ok=True)
@@ -40,9 +40,8 @@ def main():
     # inicia os workers
     local_processes = start_workers(workers)
 
-    # espera os sockets iniciarem
-
     try:
+        # espera 1 segundo para garantir que os workers estejam prontos
         time.sleep(1)
         results = run_benchmarks(
             tests=tests,

@@ -1,5 +1,4 @@
 import time
-import os
 
 from .distributed import (
     distributed_multiply_parallel,

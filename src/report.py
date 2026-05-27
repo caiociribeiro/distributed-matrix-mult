@@ -128,11 +128,8 @@ def print_table(results):
 
 # filtra resultados de um modo especifico
 def get_mode_results(results, mode, workers):
-    if mode == "serial":
+    if mode in {"serial", "threads", "processes"}:
         return [r for r in results if r.mode == mode]
-
-    if mode in {"threads", "processes"}:
-        return [r for r in results if r.mode == mode and r.workers == 4]
 
     return [r for r in results if r.mode == mode and r.workers == workers]
 
