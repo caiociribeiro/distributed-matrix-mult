@@ -6,8 +6,8 @@ import numpy as np
 
 MODE_LABELS = {
     "serial": "Serial",
-    "threads": "Threads (4)",
-    "processes": "Processos (4)",
+    "threads": "Threads",
+    "processes": "Processos",
     "distributed_serial": "Distribuída (1 core)",
     "distributed_parallel": "Distribuída (>1 core)",
 }
