@@ -128,7 +128,7 @@ A implementação distribuída paralela também utiliza multiprocessing interno 
 
 ---
 
-# Resultados Gerados
+# Resultados
 
 Após a execução, o programa cria automaticamente uma pasta em:
 
